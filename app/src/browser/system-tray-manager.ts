@@ -1,5 +1,5 @@
 import path from 'path';
-import { Tray, Menu, nativeImage, nativeTheme } from 'electron';
+import { Tray, Menu, nativeImage, nativeTheme, app } from 'electron';
 import { localized } from '../intl';
 import Application from './application';
 
@@ -104,20 +104,38 @@ class SystemTrayManager {
       this._tray = new Tray(_getIcon(this._iconPath || this._defaultIconPath()));
       this._tray.setToolTip(_getTooltip(this._unreadString));
       this._tray.addListener('click', this._onClick);
-      this._tray.setContextMenu(
-        Menu.buildFromTemplate(_getMenuTemplate(this._platform, this._application) as any)
-      );
+      if (this._platform === 'darwin') {
+        // setContextMenu makes macOS display the menu on left-click as well.
+        // Use a right-click handler so an ordinary click can activate Mailspring.
+        this._tray.addListener('right-click', this._onRightClick);
+      } else {
+        this._tray.setContextMenu(
+          Menu.buildFromTemplate(_getMenuTemplate(this._platform, this._application) as any)
+        );
+      }
     }
   }
 
   _onClick = () => {
-    if (this._platform !== 'darwin') {
-      if (this._application.windowManager.getVisibleWindowCount() === 0) {
-        this._application.emit('application:show-main-window');
-      } else {
-        const visibleWindows = this._application.windowManager.getVisibleWindows();
-        visibleWindows.forEach((window) => window.hide());
-      }
+    if (this._platform === 'darwin') {
+      app.focus({ steal: true });
+      this._application.emit('application:show-main-window');
+      return;
+    }
+
+    if (this._application.windowManager.getVisibleWindowCount() === 0) {
+      this._application.emit('application:show-main-window');
+    } else {
+      const visibleWindows = this._application.windowManager.getVisibleWindows();
+      visibleWindows.forEach((window) => window.hide());
+    }
+  };
+
+  _onRightClick = () => {
+    if (this._platform === 'darwin' && this._tray) {
+      this._tray.popUpContextMenu(
+        Menu.buildFromTemplate(_getMenuTemplate(this._platform, this._application) as any)
+      );
     }
   };
 
@@ -137,6 +155,9 @@ class SystemTrayManager {
     // we cannot destroy the tray icon on linux.
     if (this._tray && process.platform !== 'linux') {
       this._tray.removeListener('click', this._onClick);
+      if (this._platform === 'darwin') {
+        this._tray.removeListener('right-click', this._onRightClick);
+      }
       this._tray.destroy();
       this._tray = null;
     }

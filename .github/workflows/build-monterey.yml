@@ -50,24 +50,35 @@ jobs:
         # The newer Icon Composer format requires macOS 26 tooling.
         run: rm -rf app/build/resources/mac/mailspring.icon
 
-      - name: Build macOS application
-        run: npm run build
+      - name: Build macOS application (without ZIP installer)
+        run: npm run build -- --skip-installers
 
       - name: Verify packaged application
         shell: bash
         run: |
-          test -s app/dist/Mailspring.zip
           APP="app/dist/Mailspring-darwin-x64/Mailspring.app"
           test -d "$APP"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$APP/Contents/Info.plist")" = "Mailspring"
           /usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist" || true
           file "$APP/Contents/MacOS/Mailspring"
-          shasum -a 256 app/dist/Mailspring.zip
+          file "$APP/Contents/Resources/app.asar.unpacked/mailsync" || true
+
+      - name: Create installable DMG
+        shell: bash
+        run: |
+          STAGING="$RUNNER_TEMP/mailspring-dmg"
+          mkdir -p "$STAGING"
+          ditto "app/dist/Mailspring-darwin-x64/Mailspring.app" "$STAGING/Mailspring.app"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create -volname Mailspring -srcfolder "$STAGING" -ov -format UDZO Mailspring-Monterey.dmg
+          hdiutil verify Mailspring-Monterey.dmg
+          shasum -a 256 Mailspring-Monterey.dmg
 
       - name: Upload build as Actions artifact
         uses: actions/upload-artifact@v4
         with:
           name: Mailspring-Monterey
-          path: app/dist/Mailspring.zip
+          path: Mailspring-Monterey.dmg
           retention-days: 30
           if-no-files-found: error
 
@@ -76,7 +87,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          cp app/dist/Mailspring.zip Mailspring-Monterey.zip
           if ! gh release view monterey-latest >/dev/null 2>&1; then
             gh release create monterey-latest \
               --target "$GITHUB_SHA" \
@@ -84,7 +94,8 @@ jobs:
               --notes "Development build from main. Intel macOS / Monterey 12.x target. Unsigned and not notarized." \
               --latest=false
           fi
-          gh release upload monterey-latest Mailspring-Monterey.zip --clobber
+          gh release upload monterey-latest Mailspring-Monterey.dmg --clobber
+          gh release delete-asset monterey-latest Mailspring-Monterey.zip --yes 2>/dev/null || true
           gh release edit monterey-latest \
             --title "Monterey build (latest)" \
             --notes "Build of main at commit $GITHUB_SHA. Intel macOS / Monterey 12.x target. Unsigned and not notarized."
