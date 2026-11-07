@@ -45,6 +45,11 @@ jobs:
           fi
           file app/mailsync
 
+      - name: Use legacy macOS icon for Monterey
+        # Electron Packager prefers mailspring.icon over mailspring.icns.
+        # The newer Icon Composer format requires macOS 26 tooling.
+        run: rm app/build/resources/mac/mailspring.icon
+
       - name: Build macOS application
         run: npm run build
 
