@@ -1,0 +1,85 @@
+name: Build Mailspring for Monterey
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monterey-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    env:
+      CI: "true"
+      OVERRIDE_TO_INTEL: "1"
+      MACOSX_DEPLOYMENT_TARGET: "12.0"
+      npm_config_arch: "x64"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm install --no-audit
+
+      - name: Check bundled sync engine
+        shell: bash
+        run: |
+          if [[ ! -f app/mailsync ]]; then
+            echo "Expected app/mailsync from postinstall is missing"
+            find app -maxdepth 2 -iname '*mailsync*' -print
+            exit 1
+          fi
+          file app/mailsync
+
+      - name: Build macOS application
+        run: npm run build
+
+      - name: Verify packaged application
+        shell: bash
+        run: |
+          test -s app/dist/Mailspring.zip
+          APP="app/dist/Mailspring-darwin-x64/Mailspring.app"
+          test -d "$APP"
+          /usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP/Contents/Info.plist" || true
+          file "$APP/Contents/MacOS/Mailspring"
+          shasum -a 256 app/dist/Mailspring.zip
+
+      - name: Upload build as Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mailspring-Monterey
+          path: app/dist/Mailspring.zip
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Publish stable download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          cp app/dist/Mailspring.zip Mailspring-Monterey.zip
+          if ! gh release view monterey-latest >/dev/null 2>&1; then
+            gh release create monterey-latest \
+              --target "$GITHUB_SHA" \
+              --title "Monterey build (latest)" \
+              --notes "Development build from main. Intel macOS / Monterey 12.x target. Unsigned and not notarized." \
+              --latest=false
+          fi
+          gh release upload monterey-latest Mailspring-Monterey.zip --clobber
+          gh release edit monterey-latest \
+            --title "Monterey build (latest)" \
+            --notes "Build of main at commit $GITHUB_SHA. Intel macOS / Monterey 12.x target. Unsigned and not notarized."
