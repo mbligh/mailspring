@@ -4,6 +4,7 @@
 Maintain the Mailspring desktop client for Intel Macs running macOS Monterey 12.7.x, starting from upstream 1.23.0. Keep changes directly on `main`.
 
 ## Implementation
+- Backport upstream contact email normalization from Mailspring 1.24: trim surrounding whitespace when constructing or loading contacts so Google Contacts selections pass email validation. Regression coverage is in `app/spec/models/contact-spec.ts`; retain the 1.23 base and pinned Electron version.
 - On macOS, left-clicking the menu-bar tray icon activates the main window; right-click displays the existing menu. Other platforms retain their existing tray behavior.
 - The application bundle remains named `Mailspring.app`; Finder may rename an existing duplicate if both copies are retained.
 - Electron is pinned to 41.7.2 in `package.json`. Avoid upgrades that drop macOS 12.

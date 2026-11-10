@@ -24,6 +24,23 @@ describe('Contact', function () {
     expect(c1.email).toBe('evan@mailspring.com');
   });
 
+  it('trims surrounding whitespace from email addresses', function () {
+    const fromConstructor = new Contact({
+      name: 'Example Contact',
+      email: ' example@gmail.com\t',
+    });
+    expect(fromConstructor.email).toBe('example@gmail.com');
+    expect(fromConstructor.isValid()).toBe(true);
+
+    const fromJSON = new Contact({});
+    fromJSON.fromJSON({
+      name: 'Example Contact',
+      email: '\u00a0example@gmail.com\r\n',
+    });
+    expect(fromJSON.email).toBe('example@gmail.com');
+    expect(fromJSON.isValid()).toBe(true);
+  });
+
   it('correctly parses first and last names', function () {
     const c1 = new Contact({ name: 'Evan Morikawa' });
     expect(c1.firstName()).toBe('Evan');
