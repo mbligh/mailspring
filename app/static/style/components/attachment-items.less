@@ -34,6 +34,16 @@
     border-top-right-radius: 8px;
   }
 
+  // Display the entire video still at its natural aspect ratio rather than
+  // cropping it to the fixed-height, cover-sized document thumbnail strip.
+  &.video-preview .file-thumbnail-preview {
+    display: block;
+    height: auto;
+    max-height: 400px;
+    object-fit: contain;
+    background-color: #000;
+  }
+
   &.file-attachment-item.has-preview {
     &:focus {
       .file-info-wrap,

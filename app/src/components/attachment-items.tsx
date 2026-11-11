@@ -192,10 +192,15 @@ export class AttachmentItem extends Component<AttachmentItemProps> {
       onSaveAttachment,
       ...extraProps
     } = this.props;
+    const isVideoPreview =
+      Boolean(filePreviewPath) &&
+      (/^video\//i.test(this.props.contentType || '') ||
+        /\.(mp4|m4v|mov|webm|avi|mkv)$/i.test(displayName || ''));
     const classes = classnames({
       'nylas-attachment-item': true,
       'file-attachment-item': true,
       'has-preview': filePreviewPath,
+      'video-preview': isVideoPreview,
       [className]: className,
     });
     const style = draggable ? { WebkitUserDrag: 'element' } : null;
@@ -220,13 +225,22 @@ export class AttachmentItem extends Component<AttachmentItemProps> {
         {...pickHTMLProps(extraProps)}
       >
         {filePreviewPath ? (
-          <div
-            draggable={false}
-            className="file-thumbnail-preview"
-            style={{
-              background: `url('file://${filePreviewPath.replace(/\\/g, '\\\\')}') 0% 1% / cover`,
-            }}
-          />
+          isVideoPreview ? (
+            <img
+              draggable={false}
+              className="file-thumbnail-preview"
+              src={`file://${filePreviewPath}`}
+              alt=""
+            />
+          ) : (
+            <div
+              draggable={false}
+              className="file-thumbnail-preview"
+              style={{
+                background: `url('file://${filePreviewPath.replace(/\\/g, '\\\\')}') 0% 1% / cover`,
+              }}
+            />
+          )
         ) : null}
         <div className="inner">
           <ProgressBar download={download} />
