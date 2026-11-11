@@ -1,15 +1,28 @@
-# Mailspring (Monterey fork)
+# Mailspring Monterey fork
 
-## Requirements
-
-- Maintain an installable Intel macOS 12 (Monterey) version of Mailspring under the app name **Mailspring**.
-- Deliver the app as a DMG, not a ZIP; keep the existing sync engine bundled.
-- Left-clicking the macOS status-bar icon brings the window to the front; right-clicking retains its menu.
-- Show media attachments without distorting or severely cropping their aspect ratio. Video attachments use a full-frame preview while ordinary document thumbnails remain compact.
+## Purpose
+Maintain the Mailspring desktop client for Intel Macs running macOS Monterey 12.7.x, starting from upstream 1.23.0. Keep changes directly on `main`.
 
 ## Implementation
+- Backport upstream contact email normalization from Mailspring 1.24: trim surrounding whitespace when constructing or loading contacts so Google Contacts selections pass email validation. Regression coverage is in `app/spec/models/contact-spec.ts`; retain the 1.23 base and pinned Electron version.
+- On macOS, left-clicking the menu-bar tray icon activates the main window; right-click displays the existing menu. Other platforms retain their existing tray behavior.
+- The application bundle remains named `Mailspring.app`; Finder may rename an existing duplicate if both copies are retained.
+- Electron is pinned to 41.7.2 in `package.json`. Avoid upgrades that drop macOS 12.
+- UI and packaging live in this repository; the C++ `mailsync` engine is an upstream submodule, with a prebuilt binary downloaded during `npm install`.
+- `.github/workflows/build-monterey.yml` builds the Intel `Mailspring.app` on an Intel macOS GitHub runner and uses the upstream build script without its ZIP installer, then creates a DMG containing `Mailspring.app` and a drag-to-Applications shortcut.
+- Successful builds replace `Mailspring-Monterey.dmg` on the fixed `monterey-latest` GitHub release.
 
-- Electron/React/TypeScript app with the existing Mailspring-Sync native backend.
-- Received-message attachments render via `app/internal_packages/attachments/lib/message-attachments.tsx` and `app/src/components/attachment-items.tsx`. Styling is in `app/static/style/components/attachment-items.less`.
-- macOS Quick Look generates the video-preview PNG; the attachment component displays it as a responsive image with a height cap and `object-fit: contain`. Other file types retain the existing cropped strip layout.
-- Commits to `main` trigger `.github/workflows/build-monterey.yml`, producing a DMG and updating the `monterey-latest` GitHub release asset.
+## Build and download
+- Workflow: https://github.com/mbligh/mailspring/actions/workflows/build-monterey.yml
+- Stable download (after first successful build): https://github.com/mbligh/mailspring/releases/download/monterey-latest/Mailspring-Monterey.dmg
+- Builds run on pushes to `main` and via `workflow_dispatch`.
+- The app is **unsigned and unnotarized**; Gatekeeper may require explicit authorization. Packaging on macOS 15 does not itself establish compatibility with Monterey; test on macOS 12.7.
+
+## Follow-up
+- Verify the new DMG and tray interactions on Monterey 12.7 (left-click when hidden/minimized/background, right-click menu).
+- Selectively backport upstream security fixes, privacy fixes, and sync correctness changes while retaining Monterey support.
+
+## Video attachment preview (November 2026)
+- The attachment renderer identifies video files by MIME type or common video extension and uses an inline PNG preview image instead of a fixed-height background strip.
+- The CSS uses responsive width, a 400px maximum height, and `object-fit: contain` to preserve full-frame video preview aspect ratios. Non-video attachment previews retain the original compact strip.
+- This is a Quick Look-generated thumbnail, not an embedded playable video element.
